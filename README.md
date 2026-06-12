@@ -138,7 +138,12 @@ See `eval/README.md`. Quick start:
 
 **Dataset:** 52 Pexels fashion/street-style photos in `eval/images/` (run `python eval/download_images.py` to refresh).
 
-**Labels:** 16 images hand-reviewed in `eval/manual_labels.py`; remaining rows drafted via classifier. Re-run with your key for best results:
+**Labels:** of the 52 rows, 16 are hand-reviewed ground truth (`eval/manual_labels.py`)
+and the remaining 36 are provisional drafts produced by the classifier itself. I'm
+calling this out honestly: scoring against model-drafted labels is partly circular
+and inflates agreement, so treat the headline numbers as indicative until the full
+set is hand-labeled. The hand-reviewed subset is the more trustworthy signal. To
+regenerate and run against the real model:
 
 ```bash
 export OPENAI_API_KEY=your_key
