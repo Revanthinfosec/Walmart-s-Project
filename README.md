@@ -12,6 +12,20 @@ Design teams collect thousands of reference photos from markets, stores, and str
 - SQLite + FTS5 instead of Elasticsearch
 - Location/time context split between AI inference (continent/country/city) and capture timestamp (year/month filters)
 
+## Screenshots
+
+| Gallery + filters | Upload + live classification |
+|---|---|
+| ![Gallery](docs/screenshots/01-gallery.png) | ![Upload](docs/screenshots/02-upload.png) |
+
+| Detail: AI output vs designer input | Attribute filter applied |
+|---|---|
+| ![Detail](docs/screenshots/03-detail.png) | ![Filters](docs/screenshots/04-filters.png) |
+
+| Full-text search ("denim") |
+|---|
+| ![Search](docs/screenshots/05-search.png) |
+
 ## What I built / What I learned / Limitations
 
 **What I built.** An end-to-end pipeline that takes a raw inspiration photo,
