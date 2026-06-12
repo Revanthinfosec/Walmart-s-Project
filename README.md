@@ -12,6 +12,34 @@ Design teams collect thousands of reference photos from markets, stores, and str
 - SQLite + FTS5 instead of Elasticsearch
 - Location/time context split between AI inference (continent/country/city) and capture timestamp (year/month filters)
 
+## What I built / What I learned / Limitations
+
+**What I built.** An end-to-end pipeline that takes a raw inspiration photo,
+classifies the garment with a multimodal model into structured attributes plus a
+natural-language description, stores everything in SQLite with FTS5 full-text
+search, and surfaces it through a React grid with dynamic filters. On top of the
+AI output, designers can layer their own tags and notes, which are stored
+separately but indexed alongside the AI text so a single search box spans both.
+
+**What I learned.**
+- FTS5 is a lot of leverage for a one-day POC — I get natural-language search over
+  both AI descriptions and human notes without standing up a separate search
+  service, as long as I sanitize raw query input so stray operators don't raise
+  syntax errors.
+- Keeping AI output and human annotations in separate columns (rather than
+  merging them) kept the model honest and the UI clear about provenance — you can
+  always tell what the model said versus what the designer added.
+- Treating the Pydantic models as the single source of truth and mirroring them
+  in the TypeScript types removed a whole class of frontend/backend drift bugs.
+- The model is strong on broad descriptive tags but weak on exact taxonomy and
+  geography, which pushed me toward "≥50% set overlap" scoring for list fields
+  rather than demanding exact matches.
+
+**Limitations.** Single-user with no auth; AI-inferred location is a scene guess,
+not capture GPS; no pagination or deduplication yet; and the eval set isn't
+bundled (you supply images locally). See *Limitations & next steps* below for the
+full list and what I'd do with another day.
+
 ## Project structure
 
 ```
