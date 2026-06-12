@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -7,7 +8,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 import classifier
 import db
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from models import ClassificationResult, FilterOptions, GarmentType, ImageRecord, ImageUpdate, SearchFilters, Season
@@ -15,7 +16,14 @@ from models import ClassificationResult, FilterOptions, GarmentType, ImageRecord
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="Fashion Inspiration", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.init_db()
+    yield
+
+
+app = FastAPI(title="Fashion Inspiration", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,11 +34,6 @@ app.add_middleware(
 )
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-
-@app.on_event("startup")
-def startup() -> None:
-    db.init_db()
 
 
 @app.get("/health")
@@ -140,13 +143,14 @@ async def upload_image(
     if not file.filename:
         raise HTTPException(status_code=400, detail="Need a filename")
 
-    path = UPLOAD_DIR / file.filename
+    safe_name = Path(file.filename).name
+    path = UPLOAD_DIR / safe_name
     with path.open("wb") as out:
         out.write(await file.read())
 
     tags = classifier.classify_image(path)
     return db.insert_image(
-        file.filename,
+        safe_name,
         str(path),
         tags,
         designer=designer,
@@ -183,7 +187,7 @@ async def preview(file: UploadFile = File(...)) -> ClassificationResult:
     if not file.filename:
         raise HTTPException(status_code=400, detail="Need a filename")
 
-    path = UPLOAD_DIR / f"preview_{file.filename}"
+    path = UPLOAD_DIR / f"preview_{Path(file.filename).name}"
     with path.open("wb") as out:
         out.write(await file.read())
 

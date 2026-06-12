@@ -221,13 +221,21 @@ def _json_list_like(field: str, value: str) -> tuple[str, str]:
     return (f"lower(json_extract(i.classification_json, '$.{field}')) LIKE ?", f"%{value.lower()}%")
 
 
+def _fts_query(raw: str) -> str:
+    # Quote each token so FTS5 treats user input as literal terms instead of
+    # query syntax — otherwise a stray quote or bare AND/OR raises a syntax error.
+    tokens = raw.split()
+    return " ".join('"' + token.replace('"', '""') + '"' for token in tokens)
+
+
 def search_images(filters: SearchFilters) -> list[ImageRecord]:
     where: list[str] = []
     params: list[str] = []
 
-    if filters.query:
+    fts_query = _fts_query(filters.query) if filters.query else ""
+    if fts_query:
         where.append("images_fts MATCH ?")
-        params.append(filters.query)
+        params.append(fts_query)
     if filters.garment_type:
         where.append("json_extract(i.classification_json, '$.garment_type') = ?")
         params.append(filters.garment_type.value)
@@ -281,7 +289,7 @@ def search_images(filters: SearchFilters) -> list[ImageRecord]:
         params.append(filters.designer.lower())
 
     sql = "SELECT i.* FROM images i"
-    if filters.query:
+    if fts_query:
         sql += " JOIN images_fts fts ON fts.rowid = i.id"
     if where:
         sql += " WHERE " + " AND ".join(where)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app" / "backend"))
 
-from classifier import normalize_classification, parse_model_json
+from classifier import parse_model_json, to_classification
 from models import GarmentType, Season
 
 
@@ -16,7 +16,7 @@ def test_json_inside_code_fence():
 
 
 def test_normalizes_full_attribute_set():
-    result = normalize_classification(
+    result = to_classification(
         {
             "garment_type": "TOP",
             "style": "minimalist",
@@ -39,6 +39,6 @@ def test_normalizes_full_attribute_set():
 
 
 def test_unknown_values_get_safe_defaults():
-    result = normalize_classification({"garment_type": "jumpsuit", "season": "monsoon"})
+    result = to_classification({"garment_type": "jumpsuit", "season": "monsoon"})
     assert result.garment_type == GarmentType.OTHER
     assert result.season == Season.ALL_SEASON

@@ -100,3 +100,11 @@ def test_full_text_search_on_description():
     add("dress-search.jpg", _classification(description="embroidered neckline at artisan market"))
     results = db.search_images(SearchFilters(query="embroidered"))
     assert any(img.filename == "dress-search.jpg" for img in results)
+
+
+def test_full_text_search_handles_special_characters():
+    add("dress-search.jpg", _classification(description="embroidered neckline at artisan market"))
+    # Raw FTS5 syntax characters must not crash the query.
+    for query in ['"embroidered', "neckline AND", "market)"]:
+        results = db.search_images(SearchFilters(query=query))
+        assert isinstance(results, list)

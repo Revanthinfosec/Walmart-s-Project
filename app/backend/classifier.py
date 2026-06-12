@@ -138,7 +138,3 @@ def stub_result(image_path: Path) -> ClassificationResult:
         location=LocationContext(continent="unknown", country="unknown", city="unknown"),
         description=f"Stub tags for {image_path.name}. Add OPENAI_API_KEY for real classification.",
     )
-
-
-extract_json_payload = parse_model_json
-normalize_classification = to_classification
