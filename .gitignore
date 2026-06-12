@@ -11,3 +11,4 @@ app/frontend/node_modules/
 app/frontend/dist/
 tests/uploads/
 .DS_Store
+.vscode/
