@@ -1,5 +1,7 @@
 import csv
+import json
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -8,9 +10,36 @@ sys.path.insert(0, str(BACKEND))
 
 from classifier import classify_image  # noqa: E402
 
+try:  # only present when the OpenAI client is installed
+    import openai
+
+    RATE_LIMIT_ERRORS: tuple = (openai.RateLimitError,)
+except Exception:  # pragma: no cover - stub/offline mode
+    RATE_LIMIT_ERRORS = ()
+
+# Pace requests so a low tokens-per-minute tier doesn't hard-fail the run.
+REQUEST_DELAY = 1.0       # seconds between images
+MAX_RETRIES = 8           # retries on a 429 rate-limit
+MAX_BACKOFF = 60.0        # cap on the backoff wait
+
+
+def classify_with_retry(path: Path):
+    """Classify one image, backing off and retrying when rate-limited."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            return classify_image(path)
+        except RATE_LIMIT_ERRORS:
+            wait = min(MAX_BACKOFF, 8.0 * (2 ** attempt))
+            print(f"    rate limited - waiting {wait:.0f}s ({attempt + 1}/{MAX_RETRIES})", flush=True)
+            time.sleep(wait)
+    # Last attempt: let any error surface instead of silently swallowing it.
+    return classify_image(path)
+
 ROOT = Path(__file__).parent
 IMAGES = ROOT / "images"
 LABELS = ROOT / "labels.csv"
+# Cache raw model predictions so a re-score never re-pays for the API run.
+CACHE = ROOT / "predictions_cache.json"
 
 FIELDS = [
     "garment_type",
@@ -70,18 +99,39 @@ def main():
     hits = defaultdict(int)
     missing = []
 
-    for row in rows:
-        path = IMAGES / row["filename"]
+    cache: dict = {}
+    if CACHE.exists():
+        try:
+            cache = json.loads(CACHE.read_text())
+        except Exception:
+            cache = {}
+
+    total_rows = len(rows)
+    for index, row in enumerate(rows, start=1):
+        filename = row["filename"]
+        path = IMAGES / filename
         if not path.exists():
-            missing.append(row["filename"])
+            missing.append(filename)
             continue
 
-        result = classify_image(path).model_dump()
+        if filename in cache:
+            result = cache[filename]
+            print(f"[{index}/{total_rows}] {filename} (cached)", flush=True)
+        else:
+            print(f"[{index}/{total_rows}] {filename}", flush=True)
+            # mode="json" serializes enums to their values ("dress"), so scalar
+            # comparisons work; the python-mode dump leaks "GarmentType.DRESS".
+            result = classify_with_retry(path).model_dump(mode="json")
+            cache[filename] = result
+            CACHE.write_text(json.dumps(cache, indent=2))
+            time.sleep(REQUEST_DELAY)
+
         for field in FIELDS:
             totals[field] += 1
             if matches(predicted_value(result, field), row.get(field, ""), field):
                 hits[field] += 1
 
+    print()
     print("Per-attribute accuracy")
     print("-" * 44)
     for field in FIELDS:

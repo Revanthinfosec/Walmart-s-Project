@@ -125,7 +125,7 @@ React UI  →  FastAPI  →  OpenAI Vision (classify)
 | Location + time + designer filters | Done |
 | Full-text search | Done |
 | Designer tags/notes (distinct from AI) | Done |
-| Eval script + labels template | Done (needs 50–100 images) |
+| Eval script + labels template | Done (52 images, real `gpt-4o-mini` run) |
 | Unit / integration / e2e tests | Done |
 
 ## Model evaluation
@@ -152,24 +152,58 @@ python eval/apply_manual_labels.py  # merge with hand-reviewed rows
 python eval/evaluate.py
 ```
 
-**Sample eval run (stub classifier, no API key):**
+**Real eval run (`gpt-4o-mini`, 52 images):**
 
-| Field | Accuracy |
-|-------|----------|
-| garment_type | 0% (stub defaults to `other`) |
-| materials | 82.7% |
-| patterns | 88.5% |
-| occasion | 84.6% |
-| continent / country | ~96% |
-| season | 0% (stub defaults to `all_season`) |
+| Field | Correct | Accuracy |
+|-------|---------|----------|
+| garment_type | 27/52 | 51.9% |
+| style_tags | 10/52 | 19.2% |
+| materials | 26/52 | 50.0% |
+| colors | 10/52 | 19.2% |
+| patterns | 25/52 | 48.1% |
+| season | 43/52 | 82.7% |
+| occasion | 34/52 | 65.4% |
+| consumer_profile | 1/52 | 1.9% |
+| trend_notes | 0/52 | 0.0% |
+| continent | 46/52 | 88.5% |
+| country | 49/52 | 94.2% |
+| city | 51/52 | 98.1% |
 
-**With OpenAI enabled**, expect garment type and season to jump significantly; location fields may stay weaker because the model infers scene context rather than capture GPS.
+Scoring: exact (case-insensitive) match for scalar fields; ≥50% set overlap for
+list fields. Run it yourself with `python eval/evaluate.py` and a valid
+`OPENAI_API_KEY` — predictions are cached in `eval/predictions_cache.json`, so a
+re-score is instant and free.
 
-**Where the model does well:** broad tags (casual, streetwear), pattern/material guesses, list overlap fields.
+**An important caveat I caught while evaluating.** The first version of the harness
+scored `garment_type` and `season` at a flat 0%. That was a bug, not the model:
+`model_dump()` serialized the enum to `"GarmentType.DRESS"` instead of `"dress"`,
+so the comparison could never match. After fixing it to `model_dump(mode="json")`,
+those fields jumped to 51.9% and 82.7%. Worth flagging because it shows why you have
+to sanity-check an eval, not just trust the first number it prints.
 
-**Where it struggles:** exact garment taxonomy, season without climate cues, precise geography, niche trend vocabulary.
+**Where the model does well:** season (82.7%) and broad location context
+(continent/country 88–94%) are strong, and garment type, materials, occasion, and
+patterns all land around 48–65% on a strict exact/overlap metric.
 
-**Next steps with more time:** few-shot prompt examples, EXIF geotags for location ground truth, human relabel UI, fine-tuned vision model.
+**Where it struggles — and how much is the metric vs. the model:**
+- `consumer_profile` (1.9%) and `trend_notes` (0%) are open-ended free text. Exact
+  and set-overlap matching is the wrong yardstick here — the model writes
+  "fashion-forward individuals who appreciate vintage" while the label says "young
+  adult." The low score reflects the metric being too literal, not the output being
+  useless. A semantic-similarity score would be fairer.
+- `style_tags` and `colors` (both 19.2%) are mostly vocabulary mismatch — "navy" vs
+  "blue", "boho" vs "bohemian" — synonyms that fail a literal overlap check.
+- The high `city` (98.1%) number is partly inflated: many street/studio shots have
+  no geographic cue, so the model correctly returns "unknown" and the label is also
+  "unknown" — a true match, but it reflects honest abstention more than geolocation
+  skill.
+- Labels themselves are a known weak point: only 16 of 52 rows are hand-reviewed;
+  the other 36 are model-drafted, which inflates agreement on some fields.
+
+**Next steps with more time:** few-shot prompt examples for garment taxonomy, a
+semantic-similarity metric for free-text fields, a controlled synonym vocabulary for
+colors/styles, EXIF geotags for real location ground truth, fully hand-labeling all
+52 rows, and a fine-tuned vision model.
 
 ## Limitations & next steps
 

@@ -10,5 +10,6 @@ app/backend/uploads/
 app/frontend/node_modules/
 app/frontend/dist/
 tests/uploads/
+eval/predictions_cache.json
 .DS_Store
 .vscode/
